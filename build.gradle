@@ -1,0 +1,127 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'maven-publish'
+}
+
+group 'net.illusionsmc'
+version = 3.0
+println('Version: ' + version)
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+ext {
+    CHANGELOG = rootProject.file('build/changelog.txt')
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+test {
+    useJUnitPlatform()
+}
+
+dependencies {
+    testImplementation('org.junit.jupiter:junit-jupiter:5.8.2')
+    testImplementation('org.junit.jupiter:junit-jupiter-engine:5.8.2')
+    testImplementation('org.powermock:powermock-core:2.0.9')
+    compileOnly('com.google.code.findbugs:jsr305:3.0.2')
+}
+
+task deleteIllusion(type: Delete) {
+    delete file("$rootDir/build/illusion")
+}
+
+task setupGit(type: Exec) {
+    file("$rootDir/build/illusion").mkdirs()
+    workingDir "./build"
+
+    commandLine "git", "init"
+    commandLine "git", "clone", "https://github.com/MinecraftIllusion/illusion"
+}
+
+task uploadFile {
+    doLast {
+        exec {
+            workingDir "./build/illusion"
+            commandLine "git", "add", "-A"
+        }
+
+        exec {
+            workingDir "./build/illusion"
+            commandLine "git", "commit", "-m", "$version commit"
+        }
+    }
+}
+
+uploadFile.mustRunAfter(publish)
+publish.mustRunAfter(setupGit)
+setupGit.mustRunAfter(deleteIllusion)
+
+
+task sourcesJar(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives jar
+    archives sourcesJar
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "illusions"
+            url = rootProject.uri("build/illusion")
+        }
+    }
+    publications {
+        mavenJava(MavenPublication) {
+            if (CHANGELOG.exists()) {
+                artifact(CHANGELOG) {
+                    classifier = 'changelog'
+                }
+            }
+            artifact jar
+            artifact sourcesJar
+            pom {
+                name = 'ZMU Utils'
+                description = 'Library for managing java obfuscation mappings in various formats.'
+                url = 'https://github.com/IllusionsMC/ZmuUtils'
+                scm {
+                    url = 'https://github.com/IllusionsMC/ZmuUtils'
+                    connection = 'scm:git:git://github.com/IllusionsMC/ZmuUtils.git'
+                    developerConnection = 'scm:git:git@github.com:IllusionsMC/ZmuUtils.git'
+                }
+                issueManagement {
+                    system = 'github'
+                    url = 'https://github.com/IllusionsMC/ZmuUtils/issues'
+                }
+
+                licenses {
+                    license {
+                        name = 'LGPLv2.1'
+                        url = 'https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'Zeqky'
+                        name = 'Zeqky'
+                    }
+                }
+            }
+        }
+    }
+}
